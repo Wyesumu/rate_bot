@@ -70,55 +70,59 @@ def channel_exists(name):
 
 @bot.message_handler(commands=['start'])
 def start(message):
-	with stages.transaction():
-		stages[str(message.chat.id)] = 'start'
-	bot.send_message(message.chat.id, 'Отправьте нам ссылку на ваш телеграм канал')
+	if message.chat.id in config.admin:
+		with stages.transaction():
+			stages[str(message.chat.id)] = 'start'
+		bot.send_message(message.chat.id, 'Отправьте нам ссылку на ваш телеграм канал')
 
 @bot.message_handler(commands=['post'])
 def make_post(message):
-	with stages.transaction():
-		stages[str(message.chat.id)] = 'post_1'
-	bot.send_message(message.chat.id, 'Отправьте боту то, что хотите опубликовать. Это может быть всё, что угодно – текст, фото, видео')
+	if message.chat.id in config.admin:
+		with stages.transaction():
+			stages[str(message.chat.id)] = 'post_1'
+		bot.send_message(message.chat.id, 'Отправьте боту то, что хотите опубликовать. Это может быть всё, что угодно – текст, фото, видео')
 
 @bot.message_handler(commands=['get_users'])
 def get_users(message):
-	workbook = xlsxwriter.Workbook('users.xlsx', {'in_memory': True})
-	worksheet = workbook.add_worksheet()
-	worksheet.write(0, 0, 'Ник в Телеграмм')
-	worksheet.write(0, 1, 'Куда нажал')
-	worksheet.write(0, 2, 'Id поста в канале')
-	worksheet.write(0, 3, 'Канал')
+	if message.chat.id in config.admin:
+		workbook = xlsxwriter.Workbook('users.xlsx', {'in_memory': True})
+		worksheet = workbook.add_worksheet()
+		worksheet.write(0, 0, 'Ник в Телеграмм')
+		worksheet.write(0, 1, 'Куда нажал')
+		worksheet.write(0, 2, 'Id поста в канале')
+		worksheet.write(0, 3, 'Канал')
 
-	for count, click in enumerate(Click.query.all()):
-		worksheet.write(count+1, 0, click.username)
-		worksheet.write(count+1, 1, click.button.data)
-		worksheet.write(count+1, 2, click.button.post.message_id)
-		worksheet.write(count+1, 3, click.button.post.channel.name)
+		for count, click in enumerate(Click.query.all()):
+			worksheet.write(count+1, 0, click.username)
+			worksheet.write(count+1, 1, click.button.data)
+			worksheet.write(count+1, 2, click.button.post.message_id)
+			worksheet.write(count+1, 3, click.button.post.channel.name)
 
-	workbook.close()
+		workbook.close()
 
-	doc = open('users.xlsx', 'rb')
-	bot.send_document(message.chat.id, doc)
+		doc = open('users.xlsx', 'rb')
+		bot.send_document(message.chat.id, doc)
 
 @bot.message_handler(commands=['change'])
 def change_likes(message):
-	parted_mes = message.text.split()
-	try:
-		mes_id = parted_mes[1]
-		count_1 = parted_mes[2]
-		count_2 = parted_mes[3]
-	except IndexError:
-		bot.send_message(message.chat.id, 'Ошибка извлечения параметров. Необходимо отправить команду в формате: /change [message_id] [likes first] [likes second]')
-		return
+	if message.chat.id in config.admin:
+		parted_mes = message.text.split()
+		try:
+			mes_id = parted_mes[1]
+			count_1 = parted_mes[2]
+			count_2 = parted_mes[3]
+		except IndexError:
+			bot.send_message(message.chat.id, 'Ошибка извлечения параметров. Необходимо отправить команду в формате: /change [message_id] [likes first] [likes second]')
+			return
 
-	channel = Channel.query.get(User.query.filter_by(user_id=message.chat.id).first().channel_id)
-	post = Post.query.filter_by(channel_id=channel.id, message_id=mes_id).first()
+		channel = Channel.query.get(User.query.filter_by(user_id=message.chat.id).first().channel_id)
+		post = Post.query.filter_by(channel_id=channel.id, message_id=mes_id).first()
 
-	with clicks.transaction():
-		clicks['click_first_'+str(post.id)] = count_1
-		clicks['click_second_'+str(post.id)] = count_2
+		with clicks.transaction():
+			clicks['click_first_'+str(post.id)] = count_1
+			clicks['click_second_'+str(post.id)] = count_2
 
-	bot.send_message(message.chat.id, "Данные успешно изменены. Количество кликов обновится при следующем уникальном клике")
+		bot.send_message(message.chat.id, "Данные успешно изменены. Количество кликов обновится при следующем уникальном клике")
 
 @bot.message_handler(content_types=["video"])
 def video_handler(message):
